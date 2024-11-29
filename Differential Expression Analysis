@@ -1,0 +1,30 @@
+latent = model.get_latent_representation() #this is for clustering
+latent.shape
+
+sc_data.obsm['X_scVI'] = latent
+sc_data.layers['scvi_normalized'] = model.get_normalized_expression(library_size = 1e4)
+sc.pp.neighbors(sc_data, use_rep = 'X_scVI')
+sc.tl.umap(sc_data)
+sc.tl.leiden(sc_data, resolution = 0.5)
+sc_data.obs.head()
+
+with rc_context({'figure.figsize': (4, 4)}):
+    sc.pl.umap(sc_data, color = ['leiden'], frameon = False)
+sc.pl.umap(sc_data, color = ['BRCA1'], frameon = False, layer = 'scvi_normalized')
+
+
+
+
+
+#Differential Expression Analysis
+df = model.differential_expression(groupby = 'leiden')
+df
+
+markers = {}
+for c in sc_data.obs.leiden.cat.categories:
+    cell_df = df.loc[df.group1 == c]
+    markers[c] = cell_df.index.tolist()[:2]
+markers
+
+sc.pl.dotplot(sc_data, markers, groupby = 'leiden', swap_axes = True,
+             use_raw = True, standard_scale = 'var', dendrogram = True)
