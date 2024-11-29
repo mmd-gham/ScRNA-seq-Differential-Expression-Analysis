@@ -1,0 +1,56 @@
+#Imports
+!pip install scvi-tools
+!pip install scikit-misc
+!pip install scanpy
+!pip install leidenalg
+import scvi
+import scanpy as sc
+
+from matplotlib.pyplot import rc_context
+sc.set_figure_params(dpi=100)
+
+
+
+
+
+#Data
+from google.colab import drive
+drive.mount('/content/drive')
+
+sc_data = sc.read_10x_h5('/content/drive/My Drive/Single-Cell RNA Breast Cancer/4plex_DTC_kidney_lung_breast_TotalSeqC_multiplex_Breast_Cancer_BC3_AB3_count_sample_raw_feature_bc_matrix.h5')
+sc_data.var_names_make_unique()
+
+
+
+
+
+#Exploring
+sc_data
+
+sc.pp.filter_cells(sc_data, min_genes = 200)
+sc.pp.filter_genes(sc_data, min_cells = 3)
+sc_data.var['mt'] = sc_data.var_names.str.startswith('mt-')
+sc.pp.calculate_qc_metrics(sc_data, qc_vars = ['mt'], percent_top = None, log1p = False, inplace = True)
+sc_data = sc_data[sc_data.obs.pct_counts_mt < 15]
+sc_data.obs.head()
+
+sc_data.layers['counts'] = sc_data.X.copy() 
+
+
+
+
+
+#scVI Model
+sc.pp.normalize_total(sc_data, target_sum = 1e4)
+sc.pp.log1p(sc_data)
+sc_data.raw = sc_data
+
+sc.pp.highly_variable_genes(sc_data, n_top_genes=3000, subset = True, layer = 'counts',
+                           flavor = "seurat_v3")
+scvi.model.SCVI.setup_anndata(sc_data, layer = "counts",
+                             continuous_covariate_keys=['pct_counts_mt', 'total_counts'])
+
+model = scvi.model.SCVI(sc_data)
+model
+model.train()
+
